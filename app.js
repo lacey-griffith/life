@@ -7,6 +7,8 @@ const state = loadState();
 const persist = () => saveState(state);
 const getQuestion = () => QUESTIONS.find(q => q.id === state.currentQuestion) || QUESTIONS[0];
 const entryById = id => state.entries.find(entry => entry.id === id);
+const starByEntryId = id => state.stars.find(star => star.entryId === id);
+const isStarred = id => Boolean(starByEntryId(id));
 const starRecords = () => state.stars.map(star => ({ ...star, entry:entryById(star.entryId) })).filter(star => star.entry);
 
 function navigate(screen){
@@ -84,7 +86,7 @@ function answerValue(){
 }
 
 function createEntry(text, question=getQuestion()){
-  return { id:newId(), at:new Date().toISOString(), text, question:question.text, pillar:question.pillar, intent:question.intent, arrival:state.arrival || 'unknown' };
+  return { id:newId(), at:new Date().toISOString(), updatedAt:null, text, question:question.text, pillar:question.pillar, intent:question.intent, arrival:state.arrival || 'unknown' };
 }
 
 function starPosition(index){
@@ -93,27 +95,63 @@ function starPosition(index){
   return { x:590 + Math.cos(angle)*ring + (Math.random()*55-27), y:470 + Math.sin(angle)*ring + (Math.random()*55-27) };
 }
 
+function addStar(entryId){
+  if (isStarred(entryId)) return;
+  const pos = starPosition(state.stars.length);
+  const entry = entryById(entryId);
+  state.stars.push({ entryId, x:pos.x, y:pos.y, importance:(entry?.text.length || 0) > 180 ? 2 : 1 });
+}
+
+function removeStar(entryId){
+  state.stars = state.stars.filter(star => star.entryId !== entryId);
+}
+
+function toggleStar(entryId){
+  if (isStarred(entryId)) removeStar(entryId); else addStar(entryId);
+  persist();
+  render();
+}
+
 function saveEntry(asStar){
   const text = answerValue();
   if (!text) return;
   const entry = createEntry(text);
   state.entries.push(entry);
-  if (asStar) {
-    const pos = starPosition(state.stars.length);
-    state.stars.push({ entryId:entry.id, x:pos.x, y:pos.y, importance:text.length > 180 ? 2 : 1 });
-  }
+  if (asStar) addStar(entry.id);
   persist();
   navigate(asStar ? 'sky' : 'archive');
 }
 
 function lightLantern(){
-  const q = getQuestion();
-  const entry = createEntry('A lantern was lit in remembrance.', q);
-  const pos = starPosition(state.stars.length);
+  const entry = createEntry('A lantern was lit in remembrance.', getQuestion());
   state.entries.push(entry);
-  state.stars.push({ entryId:entry.id, x:pos.x, y:pos.y, importance:2 });
+  addStar(entry.id);
   persist();
   navigate('sky');
+}
+
+function updateEntry(id, nextText){
+  const entry = entryById(id);
+  const text = nextText.trim();
+  if (!entry || !text) return;
+  entry.text = text;
+  entry.updatedAt = new Date().toISOString();
+  const star = starByEntryId(id);
+  if (star) star.importance = text.length > 180 ? 2 : 1;
+  persist();
+  closeModal();
+  render();
+}
+
+function deleteEntry(id){
+  const entry = entryById(id);
+  if (!entry) return;
+  if (!window.confirm('Delete this saved moment?')) return;
+  state.entries = state.entries.filter(item => item.id !== id);
+  removeStar(id);
+  persist();
+  closeModal();
+  render();
 }
 
 function groupedStars(){
@@ -149,24 +187,28 @@ function sky(){
 
 function archive(){
   const entries = state.entries.slice().reverse();
-  return `<div class="app-shell"><section class="phone">${topbar('Archive')}<div class="archive-header"><h2>Moments</h2>${entries.length?`<button class="pill" onclick="window.lifeOS.exportBackup()">Back up</button>`:''}</div>${entries.length?entries.map(entry=>`<article class="memory-card" tabindex="0" onclick="window.lifeOS.openEntry('${entry.id}')"><time>${new Date(entry.at).toLocaleDateString(undefined,{month:'short',day:'numeric'})} · ${entry.pillar}</time><p>${escapeHtml(entry.text)}</p></article>`).join(''):`<div class="empty">No saved moments yet.</div>`}${nav('archive')}</section></div>`;
+  return `<div class="app-shell"><section class="phone">${topbar('Archive')}<div class="archive-header"><h2>Moments</h2>${entries.length?`<button class="pill" onclick="window.lifeOS.exportBackup()">Back up</button>`:''}</div>${entries.length?entries.map(entry=>`<article class="memory-card" tabindex="0" onclick="window.lifeOS.openEntry('${entry.id}')"><time>${new Date(entry.at).toLocaleDateString(undefined,{month:'short',day:'numeric'})} · ${entry.pillar}${isStarred(entry.id)?' · ✦':''}</time><p>${escapeHtml(entry.text)}</p></article>`).join(''):`<div class="empty">No saved moments yet.</div>`}${nav('archive')}</section></div>`;
 }
 
 function openEntry(id){
   const entry = entryById(id);
   if (!entry) return;
-  showModal(entry.pillar, `<p><em>${escapeHtml(entry.question)}</em></p><p class="modal-answer">${escapeHtml(entry.text)}</p>`);
+  const starred = isStarred(id);
+  showModal(entry.pillar, `<p><em>${escapeHtml(entry.question)}</em></p><textarea id="editEntryText" class="textarea edit-textarea">${escapeHtml(entry.text)}</textarea><div class="entry-actions"><button class="btn btn-primary" onclick="window.lifeOS.updateEntry('${id}',document.querySelector('#editEntryText').value)">Save changes</button><button class="btn btn-secondary" onclick="window.lifeOS.toggleStar('${id}')">${starred?'Remove from sky':'✦ Add to sky'}</button><button class="btn btn-danger" onclick="window.lifeOS.deleteEntry('${id}')">Delete</button></div>`);
 }
 
+let activeModal = null;
+function closeModal(){ if(activeModal){ activeModal.remove(); activeModal=null; } }
+
 function showModal(title,html){
+  closeModal();
   const backdrop=document.createElement('div');
+  activeModal = backdrop;
   backdrop.className='modal-backdrop';
-  backdrop.innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}"><div class="modal-handle"></div><h3>${title}</h3>${html}<div class="actions"><button class="btn btn-primary">Close</button></div></div>`;
-  const close=()=>backdrop.remove();
-  backdrop.querySelector('button').onclick=close;
-  backdrop.addEventListener('click',e=>{if(e.target===backdrop)close()});
+  backdrop.innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}"><div class="modal-handle"></div><h3>${escapeHtml(title)}</h3>${html}<div class="actions"><button class="btn btn-quiet" onclick="window.lifeOS.closeModal()">Close</button></div></div>`;
+  backdrop.addEventListener('click',e=>{if(e.target===backdrop)closeModal()});
   document.body.appendChild(backdrop);
-  backdrop.querySelector('button').focus();
+  backdrop.querySelector('textarea,button')?.focus();
 }
 
 function installSkyGestures(){
@@ -190,7 +232,7 @@ function selectChoice(choice){state.selectedChoice=choice;persist();render()}
 function feedback(intent,value,element){state.affinity[intent]=(state.affinity[intent]||0)+value;persist();element.parentElement.querySelectorAll('.pill').forEach(btn=>btn.classList.remove('active'));element.classList.add('active')}
 function quickWrite(){state.currentQuestion='presence-1';state.arrival='open';navigate('question')}
 function dismissInstallTip(){state.installTipDismissed=true;persist();render()}
-function escapeHtml(value){return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
+function escapeHtml(value){return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[ch]))}
 
 function render(){
   const screens={home,arrival,question,sky,archive};
@@ -198,6 +240,6 @@ function render(){
   if(state.screen==='sky')installSkyGestures();
 }
 
-window.lifeOS={navigate,chooseQuestion,anotherQuestion,selectChoice,feedback,saveEntry,lightLantern,openEntry,zoomSky,resetSky,quickWrite,dismissInstallTip,exportBackup:()=>exportState(state)};
+window.lifeOS={navigate,chooseQuestion,anotherQuestion,selectChoice,feedback,saveEntry,lightLantern,openEntry,updateEntry,deleteEntry,toggleStar,closeModal,zoomSky,resetSky,quickWrite,dismissInstallTip,exportBackup:()=>exportState(state)};
 render();
 if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
