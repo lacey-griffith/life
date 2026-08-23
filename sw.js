@@ -1,5 +1,5 @@
-const CACHE='life-os-v03';
-const ASSETS=['./','./index.html','./styles.css','./app.js','./questions.js','./storage.js','./manifest.webmanifest','./icon.svg'];
+const CACHE='life-os-v04';
+const ASSETS=['./','./index.html','./styles.css','./accessibility.css','./app.js','./questions.js','./storage.js','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{self.skipWaiting();event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)))});
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{
