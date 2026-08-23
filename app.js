@@ -1,35 +1,203 @@
+import { QUESTIONS, ARRIVAL_OPTIONS } from './questions.js';
+import { loadState, saveState, newId, exportState } from './storage.js';
+
 const app = document.querySelector('#app');
-const seedQuestions=[
-{id:'self-choice',pillar:'Self',depth:1,states:['open','hopeful','distant'],text:'What feels most like you today?',intent:'identity',type:'choice',choices:['Silly','Serious','Quiet','Curious','Tender','Restless']},
-{id:'self-1',pillar:'Self',depth:2,states:['open','hopeful','distant'],text:'When did you feel most like yourself today?',intent:'identity',type:'text'},
-{id:'presence-1',pillar:'Presence',depth:1,states:['open','heavy','distant','hopeful'],text:'What did you notice today that you might normally have missed?',intent:'notice',type:'text'},
-{id:'energy-choice',pillar:'Energy',depth:1,states:['heavy','distant','open'],text:'What do you need more of right now?',intent:'energy',type:'choice',choices:['Rest','Space','Connection','Movement','Quiet','Fun']},
-{id:'home-1',pillar:'Home',depth:2,states:['heavy','distant'],text:'Where did today feel easier on your nervous system?',intent:'ease',type:'text'},
-{id:'wonder-1',pillar:'Wonder',depth:2,states:['open','hopeful'],text:'What has been quietly fascinating you lately?',intent:'curiosity',type:'text'},
-{id:'energy-1',pillar:'Energy',depth:1,states:['heavy','distant'],text:'What took more out of you today than it seemed like it should?',intent:'energy',type:'text'},
-{id:'connection-1',pillar:'Connection',depth:2,states:['open','heavy','hopeful'],text:'When did you feel genuinely connected to someone today?',intent:'connection',type:'text'},
-{id:'comfort-2',pillar:'Comfort',depth:1,states:['heavy','distant'],text:'What would feel kindest right now?',intent:'ground',type:'choice',choices:['Less noise','Less responsibility','Closeness','Space','Rest','I’m not sure']},
-{id:'remembrance-1',pillar:'Remembrance',depth:2,states:['heavy','distant','open','hopeful'],text:'Is there someone — human or animal — you are missing today?',intent:'grief',type:'text'},
-{id:'remembrance-2',pillar:'Remembrance',depth:2,states:['open','heavy','distant'],text:'What is one tiny thing about them you never want time to smooth away?',intent:'grief',type:'text'},
-{id:'growth-1',pillar:'Growth',depth:3,states:['open','hopeful'],text:'What truth about yourself has been getting harder to ignore?',intent:'growth',type:'text'},
-{id:'play-1',pillar:'Wonder',depth:1,states:['open','hopeful'],text:'What made you laugh, play, or feel a little lighter today?',intent:'play',type:'text'},
-{id:'ease-2',pillar:'Home',depth:2,states:['open','hopeful','heavy'],text:'What felt natural today — like you did not have to force it?',intent:'ease',type:'text'}];
-const defaultState={screen:'home',arrival:null,currentQuestion:null,moments:[],entries:[],affinity:{},lastUsed:{},constellationTransform:{x:-310,y:-170,scale:.72},selectedChoice:null,installTipDismissed:false};
-const state=Object.assign({},defaultState,safeParse(localStorage.getItem('lifeos-state')));state.moments||=[];state.entries||=[];state.affinity||={};state.lastUsed||={};state.constellationTransform||=defaultState.constellationTransform;persist();
-function safeParse(raw){try{return raw?JSON.parse(raw):{}}catch{return {}}}function persist(){localStorage.setItem('lifeos-state',JSON.stringify(state))}function navigate(screen){state.screen=screen;state.selectedChoice=null;persist();render();scrollTo({top:0,behavior:'smooth'})}function getQ(){return seedQuestions.find(q=>q.id===state.currentQuestion)||seedQuestions[0]}
-function chooseQuestion(arrival,forcedIntent=null){let eligible=seedQuestions.filter(q=>q.states.includes(arrival));if(forcedIntent)eligible=eligible.filter(q=>q.intent===forcedIntent);const now=Date.now();eligible.sort((a,b)=>((state.affinity[b.intent]||0)-(state.affinity[a.intent]||0))+((now-(state.lastUsed[b.id]||0))-(now-(state.lastUsed[a.id]||0)))/86400000*.05);const q=eligible[0]||seedQuestions[0];state.arrival=arrival;state.currentQuestion=q.id;state.lastUsed[q.id]=now;persist();navigate('question')}function anotherQuestion(){state.lastUsed[getQ().id]=Date.now();chooseQuestion(state.arrival||'open')}
-function topbar(label='Life OS'){return `<div class="topbar"><div class="brand"><span class="brand-star">✦</span><span>${label}</span></div><button class="icon-btn" onclick="navigate('home')">⌂</button></div>`}function nav(active){return `<nav class="bottom-nav"><button class="nav-btn ${active==='home'?'active':''}" onclick="navigate('home')"><span class="nav-icon">⌂</span>Hearth</button><button class="nav-btn ${active==='sky'?'active':''}" onclick="navigate('sky')"><span class="nav-icon">✦</span>Sky</button><button class="nav-btn ${active==='archive'?'active':''}" onclick="navigate('archive')"><span class="nav-icon">⌘</span>Archive</button></nav>`}
-function installTip(){const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true,isiOS=/iphone|ipad|ipod/i.test(navigator.userAgent);if(standalone||state.installTipDismissed||!isiOS)return'';return `<div class="install-card"><span>Add Life OS to your Home Screen</span><button onclick="state.installTipDismissed=true;persist();render()">×</button></div>`}
-function home(){return `<div class="app-shell"><section class="phone">${topbar()}${installTip()}<div class="hero"><div class="kicker">The Hearth</div><h1>Welcome Home</h1><div class="hearth"><span></span></div><p class="lede">How are you arriving?</p></div><div class="actions"><button class="btn btn-primary" onclick="navigate('arrival')">Check in</button><button class="btn btn-secondary" onclick="quickWrite()">Write</button></div>${nav('home')}</section></div>`}
-function arrival(){const o=[['open','🍃','Open'],['heavy','🌧','Heavy'],['distant','🌫','Distant'],['hopeful','🌅','Hopeful']];return `<div class="app-shell"><section class="phone">${topbar('Arrive')}<h2>How are you arriving?</h2><div class="card-list">${o.map(([v,e,t])=>`<button class="arrival-card" onclick="chooseQuestion('${v}')"><strong>${e}&nbsp;&nbsp;${t}</strong></button>`).join('')}</div><div class="arrival-shortcuts"><button onclick="chooseQuestion('heavy','ground')">🫂 Comfort</button><button onclick="chooseQuestion('heavy','grief')">🕯 Remember</button></div>${nav('')}</section></div>`}
-function question(){const q=getQ();const input=q.type==='choice'?`<div class="card-list choice-list">${q.choices.map(c=>`<button class="arrival-card ${state.selectedChoice===c?'selected':''}" onclick="selectChoice('${c.replaceAll("'","\\'")}')"><strong>${c}</strong></button>`).join('')}</div>`:`<textarea id="answer" class="textarea" placeholder="Write here…"></textarea>`;return `<div class="app-shell"><section class="phone">${topbar(q.intent==='grief'?'Remembrance':'Reflect')}<div class="question-tag">${q.pillar}</div><div class="question">${q.text}</div>${input}<div class="feedback"><button class="pill" onclick="feedback('${q.intent}',1,this)">♡ Helped</button><button class="pill" onclick="feedback('${q.intent}',2,this)">🌱 More</button><button class="pill" onclick="feedback('${q.intent}',-1,this)">🌙 Not now</button></div><div class="actions"><button class="btn btn-primary" onclick="saveEntry(false)">Save</button><button class="btn btn-secondary" onclick="saveEntry(true)">✦ Save as star</button>${q.intent==='grief'?`<button class="btn btn-secondary" onclick="lightLantern()">🕯 Light a lantern</button>`:''}<button class="btn btn-quiet" onclick="navigate('home')">Done</button></div>${nav('')}</section></div>`}
-function selectChoice(c){state.selectedChoice=c;persist();render()}function quickWrite(){state.currentQuestion='presence-1';state.arrival='open';persist();navigate('question')}function feedback(intent,val,el){state.affinity[intent]=(state.affinity[intent]||0)+val;persist();el.classList.add('active')}
-function answerValue(){const q=getQ();return q.type==='choice'?(state.selectedChoice||''):(document.querySelector('#answer')?.value||'').trim()}function starPosition(idx){const a=(idx*2.3999632297)%(Math.PI*2),r=95+Math.sqrt(idx+1)*75;return{x:590+Math.cos(a)*r+(Math.random()*55-27),y:470+Math.sin(a)*r+(Math.random()*55-27)}}
-function saveEntry(asStar){const text=answerValue();if(!text)return;const q=getQ(),base={id:globalThis.crypto?.randomUUID?.()||String(Date.now()),at:new Date().toISOString(),text,question:q.text,pillar:q.pillar,intent:q.intent,arrival:state.arrival||'unknown'};state.entries.push(base);if(asStar){const p=starPosition(state.moments.length);state.moments.push({...base,x:p.x,y:p.y,importance:text.length>180?2:1})}persist();navigate(asStar?'sky':'archive')}
-function lightLantern(){const q=getQ(),p=starPosition(state.moments.length),base={id:globalThis.crypto?.randomUUID?.()||String(Date.now()),at:new Date().toISOString(),text:'A lantern was lit in remembrance.',question:q.text,pillar:'Remembrance',intent:'grief',arrival:state.arrival||'unknown'};state.entries.push(base);state.moments.push({...base,x:p.x,y:p.y,importance:2});persist();navigate('sky')}
-function lineBetween(a,b){const dx=b.x-a.x,dy=b.y-a.y,l=Math.hypot(dx,dy),ang=Math.atan2(dy,dx)*180/Math.PI;return `<div class="line" style="left:${a.x}px;top:${a.y}px;width:${l}px;transform:rotate(${ang}deg)"></div>`}function grouped(m){const g={};m.forEach(s=>(g[s.intent]??=[]).push(s));return g}function buildLines(m){let l='';Object.values(grouped(m)).forEach(g=>{for(let i=1;i<g.length;i++)l+=lineBetween(g[i-1],g[i])});return l}function constellationLabels(m){const names={identity:'Self',notice:'Presence',ease:'Ease',curiosity:'Wonder',energy:'Energy',connection:'Connection',ground:'Coming Back',grief:'Love That Continues',growth:'Becoming',play:'Play'};return Object.entries(grouped(m)).filter(([,g])=>g.length>=2).map(([k,g])=>`<div class="constellation-name" style="left:${g[0].x+18}px;top:${g[0].y+18}px">${names[k]||k}</div>`).join('')}
-function sky(){const m=state.moments;return `<div class="app-shell sky-shell"><section class="phone">${topbar('Night Sky')}<div class="sky-wrap" id="skyWrap">${m.length?`<div id="sky" class="sky">${buildLines(m)}${constellationLabels(m)}${m.map(s=>`<button class="star ${s.importance>1?'meaningful':''} ${s.intent==='grief'?'grief':''}" style="left:${s.x}px;top:${s.y}px" onclick="openEntry('${s.id}')"></button>`).join('')}</div>`:`<div class="empty"><div class="empty-star">✦</div>Your sky is quiet.</div>`}</div><div class="sky-controls"><span>${m.length} ${m.length===1?'star':'stars'}</span><div class="sky-buttons"><button onclick="zoomSky(-.15)">−</button><button onclick="resetSky()">⌂</button><button onclick="zoomSky(.15)">+</button></div></div>${nav('sky')}</section></div>`}
-function archive(){const e=state.entries.slice().reverse();return `<div class="app-shell"><section class="phone">${topbar('Archive')}<h2>Moments</h2>${e.length?e.map(s=>`<article class="memory-card" onclick="openEntry('${s.id}')"><time>${new Date(s.at).toLocaleDateString(undefined,{month:'short',day:'numeric'})} · ${s.pillar}</time><p>${escapeHtml(s.text)}</p></article>`).join(''):`<div class="empty">No saved moments yet.</div>`}${nav('archive')}</section></div>`}
-function openEntry(id){const s=state.entries.find(x=>x.id===id)||state.moments.find(x=>x.id===id);if(s)showModal(s.pillar,`<p><em>${escapeHtml(s.question)}</em></p><p style="color:var(--cream)">${escapeHtml(s.text)}</p>`)}function showModal(title,html){const d=document.createElement('div');d.className='modal-backdrop';d.innerHTML=`<div class="modal"><h3>${title}</h3>${html}<div class="actions"><button class="btn btn-primary">Close</button></div></div>`;d.querySelector('button').onclick=()=>d.remove();document.body.appendChild(d)}function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-function installSkyGestures(){const w=document.querySelector('#skyWrap'),s=document.querySelector('#sky');if(!w||!s)return;const t=state.constellationTransform,p=new Map();let lc=null,ld=null;const apply=()=>s.style.transform=`translate(${t.x}px,${t.y}px) scale(${t.scale})`,center=()=>{const a=[...p.values()];return{x:a.reduce((n,v)=>n+v.x,0)/a.length,y:a.reduce((n,v)=>n+v.y,0)/a.length}},dist=()=>{const a=[...p.values()];return a.length<2?null:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)};apply();w.addEventListener('pointerdown',e=>{p.set(e.pointerId,{x:e.clientX,y:e.clientY});w.setPointerCapture(e.pointerId);lc=center();ld=dist()});w.addEventListener('pointermove',e=>{if(!p.has(e.pointerId))return;p.set(e.pointerId,{x:e.clientX,y:e.clientY});const c=center();if(lc){t.x+=c.x-lc.x;t.y+=c.y-lc.y}const d=dist();if(d&&ld)t.scale=Math.max(.3,Math.min(2.5,t.scale*d/ld));lc=c;ld=d;apply()});const end=e=>{p.delete(e.pointerId);persist()};w.addEventListener('pointerup',end);w.addEventListener('pointercancel',end)}function zoomSky(d){state.constellationTransform.scale=Math.max(.3,Math.min(2.5,state.constellationTransform.scale+d));persist();render()}function resetSky(){state.constellationTransform={x:-310,y:-170,scale:.72};persist();render()}
-function render(){app.innerHTML=state.screen==='arrival'?arrival():state.screen==='question'?question():state.screen==='sky'?sky():state.screen==='archive'?archive():home();if(state.screen==='sky')installSkyGestures()}render();if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+const state = loadState();
+
+const persist = () => saveState(state);
+const getQuestion = () => QUESTIONS.find(q => q.id === state.currentQuestion) || QUESTIONS[0];
+const entryById = id => state.entries.find(entry => entry.id === id);
+const starRecords = () => state.stars.map(star => ({ ...star, entry:entryById(star.entryId) })).filter(star => star.entry);
+
+function navigate(screen){
+  state.screen = screen;
+  state.selectedChoice = null;
+  persist();
+  render();
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function questionScore(question, now){
+  const affinity = state.affinity[question.intent] || 0;
+  const lastUsed = state.lastUsed[question.id] || 0;
+  const daysSince = lastUsed ? (now - lastUsed) / 86400000 : 30;
+  return affinity + Math.min(daysSince, 7) * .08 - question.depth * .03;
+}
+
+function chooseQuestion(arrival, forcedIntent = null){
+  let pool = QUESTIONS.filter(q => q.states.includes(arrival));
+  if (forcedIntent) pool = pool.filter(q => q.intent === forcedIntent);
+  const now = Date.now();
+  pool.sort((a,b) => questionScore(b, now) - questionScore(a, now));
+  const top = pool.slice(0, Math.min(3, pool.length));
+  const question = top[Math.floor(Math.random() * top.length)] || QUESTIONS[0];
+  state.arrival = arrival;
+  state.currentQuestion = question.id;
+  state.lastUsed[question.id] = now;
+  navigate('question');
+}
+
+function anotherQuestion(){
+  state.lastUsed[getQuestion().id] = Date.now();
+  chooseQuestion(state.arrival || 'open');
+}
+
+function topbar(label='Life OS'){
+  return `<div class="topbar"><div class="brand"><span class="brand-star">✦</span><span>${label}</span></div><button class="icon-btn" onclick="window.lifeOS.navigate('home')" aria-label="Go home">⌂</button></div>`;
+}
+
+function nav(active){
+  const items = [['home','⌂','Hearth'],['sky','✦','Sky'],['archive','⌘','Archive']];
+  return `<nav class="bottom-nav" aria-label="Primary navigation">${items.map(([screen,icon,label]) => `<button class="nav-btn ${active===screen?'active':''}" onclick="window.lifeOS.navigate('${screen}')"><span class="nav-icon">${icon}</span>${label}</button>`).join('')}</nav>`;
+}
+
+function installTip(){
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (standalone || state.installTipDismissed || !isiOS) return '';
+  return `<div class="install-card"><span>Add Life OS to your Home Screen</span><button aria-label="Dismiss" onclick="window.lifeOS.dismissInstallTip()">×</button></div>`;
+}
+
+function home(){
+  return `<div class="app-shell"><section class="phone">${topbar()}${installTip()}<div class="hero"><div class="kicker">The Hearth</div><h1>Welcome Home</h1><div class="hearth" aria-hidden="true"><span></span></div><p class="lede">How are you arriving?</p></div><div class="actions"><button class="btn btn-primary" onclick="window.lifeOS.navigate('arrival')">Check in</button><button class="btn btn-secondary" onclick="window.lifeOS.quickWrite()">Write</button></div>${nav('home')}</section></div>`;
+}
+
+function arrival(){
+  return `<div class="app-shell"><section class="phone">${topbar('Arrive')}<h2>How are you arriving?</h2><div class="card-list">${ARRIVAL_OPTIONS.map(([value,emoji,label]) => `<button class="arrival-card" onclick="window.lifeOS.chooseQuestion('${value}')"><strong>${emoji}&nbsp;&nbsp;${label}</strong></button>`).join('')}</div><div class="arrival-shortcuts"><button onclick="window.lifeOS.chooseQuestion('heavy','ground')">🫂 Comfort</button><button onclick="window.lifeOS.chooseQuestion('heavy','grief')">🕯 Remember</button></div>${nav('')}</section></div>`;
+}
+
+function questionInput(question){
+  if (question.type === 'choice') {
+    return `<div class="card-list choice-list">${question.choices.map(choice => `<button class="arrival-card choice ${state.selectedChoice===choice?'selected':''}" aria-pressed="${state.selectedChoice===choice}" onclick='window.lifeOS.selectChoice(${JSON.stringify(choice)})'><strong>${choice}</strong></button>`).join('')}</div>`;
+  }
+  return `<textarea id="answer" class="textarea" placeholder="Write here…"></textarea>`;
+}
+
+function question(){
+  const q = getQuestion();
+  return `<div class="app-shell"><section class="phone">${topbar(q.intent==='grief'?'Remembrance':'Reflect')}<div class="question-tag">${q.pillar}</div><div class="question">${q.text}</div>${questionInput(q)}<div class="feedback"><button class="pill" onclick="window.lifeOS.feedback('${q.intent}',1,this)">♡ Helped</button><button class="pill" onclick="window.lifeOS.feedback('${q.intent}',2,this)">🌱 More</button><button class="pill" onclick="window.lifeOS.feedback('${q.intent}',-1,this)">🌙 Not now</button></div><div class="actions"><button class="btn btn-primary" onclick="window.lifeOS.saveEntry(false)">Save</button><button class="btn btn-secondary" onclick="window.lifeOS.saveEntry(true)">✦ Save as star</button>${q.intent==='grief'?`<button class="btn btn-secondary" onclick="window.lifeOS.lightLantern()">🕯 Light a lantern</button>`:''}<button class="btn btn-quiet" onclick="window.lifeOS.navigate('home')">Done</button></div>${nav('')}</section></div>`;
+}
+
+function answerValue(){
+  const q = getQuestion();
+  return q.type === 'choice' ? (state.selectedChoice || '') : (document.querySelector('#answer')?.value || '').trim();
+}
+
+function createEntry(text, question=getQuestion()){
+  return { id:newId(), at:new Date().toISOString(), text, question:question.text, pillar:question.pillar, intent:question.intent, arrival:state.arrival || 'unknown' };
+}
+
+function starPosition(index){
+  const angle = (index * 2.3999632297) % (Math.PI * 2);
+  const ring = 95 + Math.sqrt(index + 1) * 75;
+  return { x:590 + Math.cos(angle)*ring + (Math.random()*55-27), y:470 + Math.sin(angle)*ring + (Math.random()*55-27) };
+}
+
+function saveEntry(asStar){
+  const text = answerValue();
+  if (!text) return;
+  const entry = createEntry(text);
+  state.entries.push(entry);
+  if (asStar) {
+    const pos = starPosition(state.stars.length);
+    state.stars.push({ entryId:entry.id, x:pos.x, y:pos.y, importance:text.length > 180 ? 2 : 1 });
+  }
+  persist();
+  navigate(asStar ? 'sky' : 'archive');
+}
+
+function lightLantern(){
+  const q = getQuestion();
+  const entry = createEntry('A lantern was lit in remembrance.', q);
+  const pos = starPosition(state.stars.length);
+  state.entries.push(entry);
+  state.stars.push({ entryId:entry.id, x:pos.x, y:pos.y, importance:2 });
+  persist();
+  navigate('sky');
+}
+
+function groupedStars(){
+  const groups = {};
+  for (const star of starRecords()) (groups[star.entry.intent] ||= []).push(star);
+  return groups;
+}
+
+function lineBetween(a,b){
+  const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy), angle=Math.atan2(dy,dx)*180/Math.PI;
+  return `<div class="line" style="left:${a.x}px;top:${a.y}px;width:${len}px;transform:rotate(${angle}deg)"></div>`;
+}
+
+function buildLines(){
+  let html='';
+  for (const group of Object.values(groupedStars())) {
+    if (group.length < 2) continue;
+    const sorted = group.slice().sort((a,b) => new Date(a.entry.at)-new Date(b.entry.at));
+    for (let i=1;i<sorted.length;i++) html += lineBetween(sorted[i-1], sorted[i]);
+  }
+  return html;
+}
+
+function constellationLabels(){
+  const names={identity:'Self',notice:'Presence',ease:'Ease',curiosity:'Wonder',energy:'Energy',connection:'Connection',ground:'Coming Back',grief:'Love That Continues',growth:'Becoming',play:'Play'};
+  return Object.entries(groupedStars()).filter(([,group])=>group.length>=2).map(([intent,group])=>{const x=group.reduce((n,s)=>n+s.x,0)/group.length,y=group.reduce((n,s)=>n+s.y,0)/group.length;return `<div class="constellation-name" style="left:${x+18}px;top:${y+18}px">${names[intent]||intent}</div>`}).join('');
+}
+
+function sky(){
+  const stars = starRecords();
+  return `<div class="app-shell sky-shell"><section class="phone">${topbar('Night Sky')}<div class="sky-wrap" id="skyWrap">${stars.length?`<div id="sky" class="sky">${buildLines()}${constellationLabels()}${stars.map(star=>`<button aria-label="Open saved star" class="star ${star.importance>1?'meaningful':''} ${star.entry.intent==='grief'?'grief':''}" style="left:${star.x}px;top:${star.y}px" onclick="window.lifeOS.openEntry('${star.entryId}')"></button>`).join('')}</div>`:`<div class="empty"><div class="empty-star">✦</div>Your sky is quiet.</div>`}</div><div class="sky-controls"><span>${stars.length} ${stars.length===1?'star':'stars'}</span><div class="sky-buttons"><button aria-label="Zoom out" onclick="window.lifeOS.zoomSky(-.15)">−</button><button aria-label="Reset sky" onclick="window.lifeOS.resetSky()">⌂</button><button aria-label="Zoom in" onclick="window.lifeOS.zoomSky(.15)">+</button></div></div>${nav('sky')}</section></div>`;
+}
+
+function archive(){
+  const entries = state.entries.slice().reverse();
+  return `<div class="app-shell"><section class="phone">${topbar('Archive')}<div class="archive-header"><h2>Moments</h2>${entries.length?`<button class="pill" onclick="window.lifeOS.exportBackup()">Back up</button>`:''}</div>${entries.length?entries.map(entry=>`<article class="memory-card" tabindex="0" onclick="window.lifeOS.openEntry('${entry.id}')"><time>${new Date(entry.at).toLocaleDateString(undefined,{month:'short',day:'numeric'})} · ${entry.pillar}</time><p>${escapeHtml(entry.text)}</p></article>`).join(''):`<div class="empty">No saved moments yet.</div>`}${nav('archive')}</section></div>`;
+}
+
+function openEntry(id){
+  const entry = entryById(id);
+  if (!entry) return;
+  showModal(entry.pillar, `<p><em>${escapeHtml(entry.question)}</em></p><p class="modal-answer">${escapeHtml(entry.text)}</p>`);
+}
+
+function showModal(title,html){
+  const backdrop=document.createElement('div');
+  backdrop.className='modal-backdrop';
+  backdrop.innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}"><div class="modal-handle"></div><h3>${title}</h3>${html}<div class="actions"><button class="btn btn-primary">Close</button></div></div>`;
+  const close=()=>backdrop.remove();
+  backdrop.querySelector('button').onclick=close;
+  backdrop.addEventListener('click',e=>{if(e.target===backdrop)close()});
+  document.body.appendChild(backdrop);
+  backdrop.querySelector('button').focus();
+}
+
+function installSkyGestures(){
+  const wrap=document.querySelector('#skyWrap'), sky=document.querySelector('#sky');
+  if(!wrap||!sky) return;
+  const t=state.constellationTransform, pointers=new Map();
+  let lastCenter=null,lastDistance=null;
+  const apply=()=>sky.style.transform=`translate(${t.x}px,${t.y}px) scale(${t.scale})`;
+  const center=()=>{const a=[...pointers.values()];return{x:a.reduce((n,p)=>n+p.x,0)/a.length,y:a.reduce((n,p)=>n+p.y,0)/a.length}};
+  const distance=()=>{const a=[...pointers.values()];return a.length<2?null:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)};
+  apply();
+  wrap.addEventListener('pointerdown',e=>{pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});wrap.setPointerCapture(e.pointerId);lastCenter=center();lastDistance=distance()});
+  wrap.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const c=center();if(lastCenter){t.x+=c.x-lastCenter.x;t.y+=c.y-lastCenter.y}const d=distance();if(d&&lastDistance)t.scale=Math.max(.3,Math.min(2.5,t.scale*d/lastDistance));lastCenter=c;lastDistance=d;apply()});
+  const end=e=>{pointers.delete(e.pointerId);lastCenter=pointers.size?center():null;lastDistance=distance();persist()};
+  wrap.addEventListener('pointerup',end);wrap.addEventListener('pointercancel',end);
+}
+
+function zoomSky(delta){state.constellationTransform.scale=Math.max(.3,Math.min(2.5,state.constellationTransform.scale+delta));persist();render()}
+function resetSky(){state.constellationTransform={x:-310,y:-170,scale:.72};persist();render()}
+function selectChoice(choice){state.selectedChoice=choice;persist();render()}
+function feedback(intent,value,element){state.affinity[intent]=(state.affinity[intent]||0)+value;persist();element.parentElement.querySelectorAll('.pill').forEach(btn=>btn.classList.remove('active'));element.classList.add('active')}
+function quickWrite(){state.currentQuestion='presence-1';state.arrival='open';navigate('question')}
+function dismissInstallTip(){state.installTipDismissed=true;persist();render()}
+function escapeHtml(value){return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
+
+function render(){
+  const screens={home,arrival,question,sky,archive};
+  app.innerHTML=(screens[state.screen]||home)();
+  if(state.screen==='sky')installSkyGestures();
+}
+
+window.lifeOS={navigate,chooseQuestion,anotherQuestion,selectChoice,feedback,saveEntry,lightLantern,openEntry,zoomSky,resetSky,quickWrite,dismissInstallTip,exportBackup:()=>exportState(state)};
+render();
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
