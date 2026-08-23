@@ -1,41 +1,63 @@
-# Life OS — The Hearth v0.1
+# Life OS — The Hearth
 
-This is the first runnable prototype.
+A calm, local-first reflection prototype built around one principle: notice without being defined.
 
-## Included
-- Welcome Home / Hearth screen
+## Current experience
+
+- Hearth / Welcome Home
 - Arrival states: Open, Heavy, Distant, Hopeful
-- Seeded adaptive Question Engine
-- Question feedback ("that helped", "more like this", "not right now")
-- Remembrance-safe prompt
-- "Just light the lantern" memorial action
-- Save a reflection as a star
+- Comfort and Remembrance shortcuts
+- Curated adaptive Question Engine
+- Text and multiple-choice questions
+- Save a reflection without making it a star
+- Explicit “Save as star” choice
+- Remembrance lanterns
 - Zoomable / draggable Night Sky
-- Automatically emerging constellation lines by recurring theme
-- Archive of saved moments
-- Local-first storage using localStorage
-- PWA manifest + offline service worker
+- Archive of saved reflections
+- Local data migration between prototype versions
+- JSON backup export
+- Installable PWA shell
 
-## Run it
-Because the service worker and local storage work best over HTTP, serve the folder locally.
+## Product rules
 
-Python:
-    python3 -m http.server 8080
+- Calm comes from restraint, not explanatory UI copy.
+- Not every question needs a follow-up.
+- Not every saved reflection is a star.
+- Stars are chosen by the user.
+- Brightness represents meaning, not happiness.
+- Patterns are invitations, not conclusions.
 
-Then open:
-    http://localhost:8080
+## Architecture
 
-On iPhone, once deployed to HTTPS you can use Safari → Share → Add to Home Screen.
+- `index.html` — app shell / PWA metadata
+- `app.js` — screens and interaction orchestration
+- `questions.js` — curated question library and arrival choices
+- `storage.js` — versioned persistence, migrations, backups
+- `styles.css` — core visual system
+- `accessibility.css` — focus states and reduced-motion behavior
+- `sw.js` — offline cache
+- `manifest.webmanifest` — install metadata
+- `docs/heartbook.md` — emotional/product constitution
+- `docs/product-principles.md` — product rules and findings
+- `docs/question-engine.md` — Question Engine specification
+- `docs/review-2026-08-23.md` — current product/technical gap review
 
-## Product rule embedded in v0.1
-Star brightness represents meaning, not happiness.
+## Run locally
 
-## Not built yet
-- Real authentication/sync
-- Photos/voice notes
-- Calendar anniversary reminders
-- Editable constellation names/connections
-- True multi-touch pinch zoom
-- On-device encryption
-- AI reflection/pattern summaries
-- Safety/clinical escalation rules
+Serve the repository over HTTP:
+
+```bash
+python3 -m http.server 8080
+```
+
+Then open `http://localhost:8080`.
+
+## Current storage model
+
+Reflections are normalized as `entries`. Stars contain only spatial/importance metadata plus an `entryId` reference. Older prototype `moments` data is migrated forward automatically.
+
+Current persistence is browser `localStorage`; it is not yet suitable as the sole home for irreplaceable personal history.
+
+## Highest-priority gaps
+
+See `docs/review-2026-08-23.md`. The immediate priorities are data durability/restore, privacy/security design, edit/delete/unstar controls, Question Engine safeguards, and true user-shaped constellations.
