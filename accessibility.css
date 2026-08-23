@@ -1,0 +1,29 @@
+button:focus-visible,
+textarea:focus-visible,
+[tabindex="0"]:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 3px;
+}
+
+.choice.selected {
+  border-color: var(--ember-soft);
+  background: rgba(240,155,81,.10);
+}
+
+.archive-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+}
+
+.archive-header h2 { margin-bottom:0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior:auto !important;
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+  }
+}
