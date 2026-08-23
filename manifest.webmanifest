@@ -1,9 +1,18 @@
 {
-  "name": "Life OS \u2014 The Hearth",
+  "name": "Life OS — The Hearth",
   "short_name": "Life OS",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#14100e",
   "theme_color": "#14100e",
-  "icons": []
+  "description": "A calm place to reflect, remember, and notice your life.",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
 }
